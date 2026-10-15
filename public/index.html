@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Client Manager</title>
+<style>
+:root{--bg:#EDF0F4;--surface:#fff;--ink:#17212B;--muted:#5B6773;--line:#D6DCE3;--accent:#2347C5;--danger:#B42318;--ok:#18794E}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,"Segoe UI",Roboto,sans-serif}
+h1{margin:0;font-size:1.5rem;letter-spacing:-.01em}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid #8FA5F0;outline-offset:2px}
+button{border:1px solid var(--line);background:var(--surface);padding:.5rem .9rem;border-radius:6px;cursor:pointer}
+button:hover:not(:disabled){border-color:var(--ink)}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{background:var(--danger);border-color:var(--danger);color:#fff}
+button.link{border:0;background:none;padding:.25rem .4rem;color:var(--accent)}
+button.link.del{color:var(--danger)}
+input,select{border:1px solid var(--line);border-radius:6px;padding:.5rem .6rem;background:#fff;width:100%}
+label{display:block;font-weight:600;font-size:.875rem}
+label input{margin-top:.25rem;font-weight:400}
+.err{color:var(--danger);min-height:1.4em;margin:.5rem 0 0;font-size:.9rem}
+
+.login{min-height:100vh;display:grid;place-items:center;padding:1rem}
+.login form{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:2rem;width:100%;max-width:380px;display:grid;gap:1rem}
+.login p{margin:0;color:var(--muted)}
+.login button{width:100%;padding:.65rem}
+
+.top{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1rem 1.5rem;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.who{display:flex;align-items:center;gap:.75rem;color:var(--muted)}
+.chip{border:1px solid var(--line);border-radius:99px;padding:0 .6rem;font-size:.8rem;color:var(--ink)}
+.chip.admin{border-color:var(--accent);color:var(--accent)}
+.panel{max-width:1100px;margin:1.5rem auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.bar,.pager{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:.9rem 1.25rem;flex-wrap:wrap}
+.bar{border-bottom:1px solid var(--line)}
+.pager{border-top:1px solid var(--line);color:var(--muted)}
+.row{display:flex;align-items:center;gap:.75rem}
+.row select{width:auto}
+.row label{display:flex;align-items:center;gap:.5rem;font-weight:400;color:var(--muted)}
+.search{display:flex;gap:.6rem;padding:.9rem 1.25rem;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.search input{max-width:420px;flex:1 1 220px}
+.info{margin:0;padding:.5rem 1.25rem;background:#F7F9FB;border-bottom:1px solid var(--line);color:var(--muted);font-size:.875rem}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:720px}
+th,td{text-align:left;padding:.65rem 1.25rem;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:.85rem;color:var(--muted);font-weight:600;background:#F7F9FB}
+tbody tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;color:var(--muted);width:5rem}
+td.acts{text-align:right}
+.empty{text-align:center;color:var(--muted);padding:2.5rem 1rem}
+
+dialog{border:1px solid var(--line);border-radius:10px;padding:1.5rem;width:min(560px,92vw)}
+dialog::backdrop{background:rgba(23,33,43,.45)}
+dialog h2{margin:0 0 1rem;font-size:1.2rem}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+.grid .full{grid-column:1/-1}
+.foot{display:flex;justify-content:flex-end;gap:.6rem;margin-top:1.25rem}
+@media(max-width:560px){.grid{grid-template-columns:1fr}}
+
+.details{display:grid;grid-template-columns:9rem 1fr;gap:.6rem 1rem;margin:0}
+.details dt{color:var(--muted);font-size:.875rem}
+.details dd{margin:0;overflow-wrap:anywhere}
+@media(max-width:560px){.details{grid-template-columns:1fr;gap:0}.details dd{margin-bottom:.6rem}}
+.toast{position:fixed;bottom:1.25rem;left:50%;transform:translateX(-50%);background:var(--ink);color:#fff;padding:.6rem 1rem;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .2s}
+.toast.show{opacity:1}
+.toast.bad{background:var(--danger)}
+</style>
+</head>
+<body>
+
+<main id="login" class="login" hidden>
+  <form id="loginForm">
+    <div><h1>Client Manager</h1><p>Sign in to view and manage clients.</p></div>
+    <label>Email <input name="email" type="email" autocomplete="username" required></label>
+    <label>Password <input name="password" type="password" autocomplete="current-password" required></label>
+    <p id="loginErr" class="err" role="alert"></p>
+    <button class="primary" type="submit">Sign in</button>
+  </form>
+</main>
+
+<div id="app" hidden>
+  <header class="top">
+    <h1>Clients</h1>
+    <div class="who"><span id="who"></span><span id="role" class="chip"></span><button id="logout">Sign out</button></div>
+  </header>
+  <section class="panel">
+    <div class="bar">
+      <strong id="summary"></strong>
+      <div class="row">
+        <label>Per page
+          <select id="limit"><option>10</option><option selected>20</option><option>50</option></select>
+        </label>
+        <button id="addBtn" class="primary admin-only">Add client</button>
+      </div>
+    </div>
+    <form id="searchForm" class="search" role="search">
+      <input id="q" type="search" maxlength="100" placeholder="Search by name, email, company, city or country" aria-label="Search clients">
+      <button class="primary" type="submit">Search</button>
+      <button type="button" id="clearBtn" hidden>Clear</button>
+    </form>
+    <p id="searchInfo" class="info" role="status" hidden></p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Company</th><th>Location</th><th aria-label="Actions"></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="pager">
+      <span id="range"></span>
+      <div class="row">
+        <button id="prev">Previous</button>
+        <span id="pageInfo"></span>
+        <button id="next">Next</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<dialog id="formDialog">
+  <form id="clientForm">
+    <h2 id="formTitle"></h2>
+    <div class="grid">
+      <label>First name <input name="first_name" maxlength="100" required></label>
+      <label>Last name <input name="last_name" maxlength="100" required></label>
+      <label class="full">Email <input name="email" type="email" maxlength="254" required></label>
+      <label>Phone <input name="phone" maxlength="50"></label>
+      <label>Company <input name="company" maxlength="200"></label>
+      <label class="full">Address <input name="address" maxlength="300"></label>
+      <label>City <input name="city" maxlength="100"></label>
+      <label>Country <input name="country" maxlength="100"></label>
+    </div>
+    <p id="formErr" class="err" role="alert"></p>
+    <div class="foot"><button type="button" id="formCancel">Cancel</button><button class="primary" type="submit" id="formSave">Save client</button></div>
+  </form>
+</dialog>
+
+<dialog id="viewDialog">
+  <h2 id="viewTitle"></h2>
+  <dl class="details" id="viewBody"></dl>
+  <div class="foot"><button id="viewEdit" class="admin-only">Edit client</button><button class="primary" id="viewClose">Close</button></div>
+</dialog>
+
+<dialog id="delDialog">
+  <h2>Delete client</h2>
+  <p id="delText"></p>
+  <div class="foot"><button id="delCancel">Cancel</button><button class="danger" id="delConfirm">Delete client</button></div>
+</dialog>
+
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const FIELDS = ['first_name','last_name','email','phone','company','address','city','country'];
+const REQUIRED = ['first_name','last_name','email'];
+let token = sessionStorage.getItem('token');
+let user = JSON.parse(sessionStorage.getItem('user') || 'null');
+let page = 1, limit = 20, total = 0, pages = 1, editingId = null, deleteId = null;
+let current = new Map();
+let search = '';
+let viewId = null;
+
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const isAdmin = () => user?.role === 'admin';
+
+function toast(msg, bad) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (bad ? ' bad' : '');
+  clearTimeout(toast.t);
+  toast.t = setTimeout(() => (t.className = 'toast'), 3000);
+}
+
+async function api(path, { method = 'GET', body } = {}) {
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  if (token) headers.Authorization = 'Bearer ' + token;
+  const res = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+  if (res.status === 401 && token) {
+    signOut('Your session expired. Sign in again.');
+    throw new Error('Session expired');
+  }
+  const data = res.status === 204 ? null : await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Request failed (' + res.status + ')');
+  return data;
+}
+
+function showLogin(msg = '') {
+  $('#app').hidden = true;
+  $('#login').hidden = false;
+  $('#loginErr').textContent = msg;
+}
+
+function signOut(msg) {
+  token = null; user = null;
+  sessionStorage.clear();
+  showLogin(msg);
+}
+
+function showApp() {
+  $('#login').hidden = true;
+  $('#app').hidden = false;
+  $('#who').textContent = user.email;
+  $('#role').textContent = isAdmin() ? 'Admin' : 'View only';
+  $('#role').className = 'chip' + (isAdmin() ? ' admin' : '');
+  document.querySelectorAll('.admin-only').forEach((el) => (el.hidden = !isAdmin()));
+  load();
+}
+
+async function load() {
+  try {
+    const url = `/clients?page=${page}&limit=${limit}` + (search ? `&search=${encodeURIComponent(search)}` : '');
+    const t0 = performance.now();
+    const r = await api(url);
+    const ms = Math.round(performance.now() - t0);
+    if (!r.data.length && page > 1) { page = Math.max(1, r.total_pages || 1); return load(); }
+    total = r.total; pages = r.total_pages || 1;
+    current = new Map(r.data.map((c) => [c.id, c]));
+    render(r.data);
+    showSearchInfo(ms);
+  } catch (e) { if (token) toast(e.message, true); }
+}
+
+function render(data) {
+  const cols = 6;
+  $('#rows').innerHTML = data.length ? data.map((c) => `
+    <tr>
+      <td class="num">${c.id}</td>
+      <td>${esc(c.first_name)} ${esc(c.last_name)}</td>
+      <td>${esc(c.email)}</td>
+      <td>${esc(c.company) || '—'}</td>
+      <td>${esc([c.city, c.country].filter(Boolean).join(', ')) || '—'}</td>
+      <td class="acts"><button class="link" data-act="view" data-id="${c.id}">View</button>${isAdmin() ? `<button class="link" data-act="edit" data-id="${c.id}">Edit</button><button class="link del" data-act="del" data-id="${c.id}">Delete</button>` : ''}</td>
+    </tr>`).join('')
+    : `<tr><td class="empty" colspan="${cols}">${search
+        ? `No clients match “${esc(search)}”. Try a different name, email, company or city.`
+        : `No clients yet.${isAdmin() ? ' Select “Add client” to create the first one.' : ''}`}</td></tr>`;
+  const from = data.length ? (page - 1) * limit + 1 : 0;
+  $('#summary').textContent = total + (total === 1 ? ' client' : ' clients');
+  $('#range').textContent = `Showing ${from}–${from + data.length - (data.length ? 1 : 0)} of ${total}`;
+  $('#pageInfo').textContent = `Page ${page} of ${pages}`;
+  $('#prev').disabled = page <= 1;
+  $('#next').disabled = page >= pages;
+}
+
+$('#loginForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  $('#loginErr').textContent = '';
+  const f = e.target.elements;
+  try {
+    const r = await api('/auth/login', { method: 'POST', body: { email: f.email.value.trim(), password: f.password.value } });
+    token = r.token; user = r.user;
+    sessionStorage.setItem('token', token);
+    sessionStorage.setItem('user', JSON.stringify(user));
+    e.target.reset();
+    page = 1;
+    showApp();
+  } catch (err) { $('#loginErr').textContent = err.message; }
+});
+
+function showSearchInfo(ms) {
+  const info = $('#searchInfo');
+  info.hidden = !search;
+  $('#clearBtn').hidden = !search;
+  if (!search) return;
+  const when = new Date().toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' });
+  info.textContent = `Results for “${search}”: ${total} found. Searched ${when} (${ms} ms).`;
+}
+
+$('#searchForm').addEventListener('submit', (e) => {
+  e.preventDefault();
+  search = $('#q').value.trim();
+  page = 1;
+  load();
+});
+$('#clearBtn').onclick = () => { $('#q').value = ''; search = ''; page = 1; load(); };
+
+$('#logout').onclick = () => signOut();
+$('#prev').onclick = () => { page--; load(); };
+$('#next').onclick = () => { page++; load(); };
+$('#limit').onchange = (e) => { limit = Number(e.target.value); page = 1; load(); };
+
+function openForm(c) {
+  editingId = c?.id ?? null;
+  $('#formTitle').textContent = c ? 'Edit client' : 'Add client';
+  FIELDS.forEach((f) => ($('#clientForm').elements[f].value = c?.[f] ?? ''));
+  $('#formErr').textContent = '';
+  $('#formDialog').showModal();
+}
+$('#addBtn').onclick = () => openForm();
+$('#formCancel').onclick = () => $('#formDialog').close();
+
+$('#clientForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const body = {};
+  FIELDS.forEach((f) => {
+    const v = e.target.elements[f].value.trim();
+    if (v || REQUIRED.includes(f)) body[f] = v;
+  });
+  $('#formSave').disabled = true;
+  try {
+    if (editingId) {
+      await api('/clients/' + editingId, { method: 'PUT', body });
+      toast('Client saved');
+    } else {
+      await api('/clients', { method: 'POST', body });
+      if (!search) page = Math.ceil((total + 1) / limit);
+      toast('Client added');
+    }
+    $('#formDialog').close();
+    load();
+  } catch (err) { $('#formErr').textContent = err.message; }
+  finally { $('#formSave').disabled = false; }
+});
+
+$('#rows').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const c = current.get(Number(b.dataset.id));
+  if (b.dataset.act === 'view') openView(c.id);
+  else if (b.dataset.act === 'edit') openForm(c);
+  else {
+    deleteId = c.id;
+    $('#delText').textContent = `Delete ${c.first_name} ${c.last_name}? This can’t be undone.`;
+    $('#delDialog').showModal();
+  }
+});
+const LABELS = [['id','Client ID'],['first_name','First name'],['last_name','Last name'],['email','Email'],['phone','Phone'],['company','Company'],['address','Address'],['city','City'],['country','Country'],['created_at','Created'],['updated_at','Last updated']];
+const fmt = (k, v) => v == null || v === '' ? '—' : k.endsWith('_at') ? new Date(v).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : String(v);
+
+async function openView(id) {
+  try {
+    const c = await api('/clients/' + id);
+    viewId = c.id;
+    current.set(c.id, c);
+    $('#viewTitle').textContent = `${c.first_name} ${c.last_name}`;
+    $('#viewBody').innerHTML = LABELS.map(([k, l]) => `<dt>${l}</dt><dd>${esc(fmt(k, c[k]))}</dd>`).join('');
+    $('#viewDialog').showModal();
+  } catch (e) { if (token) toast(e.message, true); }
+}
+$('#viewClose').onclick = () => $('#viewDialog').close();
+$('#viewEdit').onclick = () => { $('#viewDialog').close(); openForm(current.get(viewId)); };
+
+$('#delCancel').onclick = () => $('#delDialog').close();
+$('#delConfirm').onclick = async () => {
+  try {
+    await api('/clients/' + deleteId, { method: 'DELETE' });
+    toast('Client deleted');
+  } catch (err) { toast(err.message, true); }
+  $('#delDialog').close();
+  load();
+};
+
+token && user ? showApp() : showLogin();
+</script>
+</body>
+</html>
