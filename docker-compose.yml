@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mwanga
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: clients_db
     ports:
       - "5000:5000"
