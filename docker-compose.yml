@@ -3,10 +3,10 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: mwanga
       POSTGRES_DB: clients_db
     ports:
-      - "5432:5432"
+      - "5000:5000"
     volumes:
       # Files here run automatically (alphabetical order) on first start
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
